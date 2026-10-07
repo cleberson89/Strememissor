@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>IRL · Transmitir</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg: #070b14; --panel: #0f1628; --panel2: #151e33; --line: #243049;
+      --text: #eef3fb; --muted: #8b9bb8; --accent: #4f8cff; --accent2: #7c5cff;
+      --green: #1ecf7a; --red: #ff4d6d; --radius: 16px;
+      --shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(79,140,255,0.18), transparent 50%),
+        radial-gradient(900px 500px at 100% 0%, rgba(124,92,255,0.12), transparent 45%),
+        var(--bg);
+      color: var(--text);
+    }
+    body { padding: 18px 16px 48px; max-width: 560px; margin: 0 auto; }
+    header { margin-bottom: 18px; }
+    header .brand { display: flex; align-items: center; gap: 12px; }
+    header .logo {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center; font-weight: 800; font-size: 0.85rem;
+      box-shadow: 0 8px 24px rgba(79,140,255,0.35);
+    }
+    header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+    header p { color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 40%), var(--panel);
+      border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow);
+    }
+    .card-title {
+      font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .pill {
+      font-size: 0.7rem; padding: 3px 8px; border-radius: 999px;
+      background: rgba(30,207,122,0.12); color: var(--green);
+      border: 1px solid rgba(30,207,122,0.25);
+    }
+    .pill.off { background: rgba(255,77,109,0.12); color: var(--red); border-color: rgba(255,77,109,0.25); }
+    .preview-wrap {
+      position: relative; border-radius: 14px; overflow: hidden;
+      background: #000; aspect-ratio: 16/9; border: 1px solid var(--line);
+    }
+    .preview-wrap video, .preview-wrap canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    }
+    .preview-wrap canvas { z-index: 2; }
+    .preview-wrap video { z-index: 1; opacity: 0; }
+    .live-badge {
+      position: absolute; top: 10px; left: 10px; z-index: 5;
+      background: rgba(255,77,109,0.92); color: #fff;
+      font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em;
+      padding: 4px 8px; border-radius: 6px; display: none;
+    }
+    .live-badge.on { display: inline-block; }
+    .mute-badge {
+      position: absolute; top: 10px; right: 10px; z-index: 5;
+      background: rgba(0,0,0,0.65); color: #fff;
+      font-size: 0.7rem; font-weight: 700;
+      padding: 4px 8px; border-radius: 6px; display: none;
+    }
+    .mute-badge.on { display: inline-block; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border: none; border-radius: 12px; padding: 12px 14px;
+      font-size: 0.92rem; font-weight: 700; cursor: pointer; color: #fff;
+      background: linear-gradient(135deg, var(--accent), #3b6fe0); width: 100%;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.green { background: linear-gradient(135deg, #1ecf7a, #12a85f); }
+    .btn.red { background: linear-gradient(135deg, #ff4d6d, #d63154); }
+    .btn.gray { background: #243049; }
+    .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+    .btn.sm { padding: 9px 12px; font-size: 0.82rem; width: auto; }
+    .btn.warn { background: linear-gradient(135deg, #f5a524, #d4891a); color: #1a1200; }
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+    .btn-row .btn { flex: 1; }
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.78rem; color: var(--muted); margin-bottom: 6px;
+    }
+    .field label span.val { color: var(--text); font-weight: 600; }
+    .field select, .field input[type="text"], .field input[type="number"], .field textarea {
+      width: 100%; padding: 11px 12px; border-radius: 11px;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 0.92rem;
+    }
+    .field input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .field textarea { min-height: 64px; resize: vertical; word-break: break-all; font-size: 0.82rem; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .checks { display: grid; gap: 8px; margin-top: 4px; }
+    .checks label { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text); margin: 0; }
+    .room-code {
+      font-size: 1.55rem; font-weight: 800; letter-spacing: 0.06em;
+      text-align: center; padding: 14px; background: var(--bg); border-radius: 12px; color: var(--green);
+      border: 1px dashed rgba(30,207,122,0.35);
+    }
+    .status {
+      font-size: 0.84rem; color: var(--muted); line-height: 1.45;
+      padding: 12px; background: var(--bg); border-radius: 12px; border: 1px solid var(--line);
+    }
+    .status strong { color: var(--green); }
+    .hint { font-size: 0.78rem; color: var(--muted); line-height: 1.4; margin-top: 8px; }
+    .ov-card {
+      background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+      padding: 10px; margin-top: 8px;
+    }
+    .ov-card h4 {
+      font-size: 0.8rem; color: var(--muted); margin-bottom: 8px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .seg {
+      display: flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px;
+      border: 1px solid var(--line); margin-bottom: 10px;
+    }
+    .seg button {
+      flex: 1; border: none; background: transparent; color: var(--muted);
+      padding: 8px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer;
+    }
+    .seg button.on { background: var(--panel2); color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">IRL</div>
+      <div>
+        <h1>Estúdio de transmissão</h1>
+        <p>P2P · overlays no stream · voz e sala fixa</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="card-title">Preview composto <span class="pill off" id="pillLive">OFFLINE</span></div>
+    <div class="preview-wrap">
+      <video id="camVideo" autoplay muted playsinline></video>
+      <canvas id="composeCanvas"></canvas>
+      <span class="live-badge" id="liveBadge">● AO VIVO</span>
+      <span class="mute-badge" id="muteBadge">MIC MUDO</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnCam">Abrir câmera</button>
+      <button class="btn green" id="btnLive" disabled>Ao vivo</button>
+      <button class="btn red" id="btnStop" disabled>Parar tudo</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost sm" id="btnCamOff" disabled>Desligar câmera</button>
+      <button class="btn warn sm" id="btnMute" disabled>Mutar mic</button>
+      <button class="btn ghost sm" id="btnFlip" disabled>Trocar câmera</button>
+    </div>
+    <p class="hint">“Desligar câmera” pausa só o vídeo (sala e áudio seguem). “Parar tudo” encerra a mídia.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Áudio e voz</div>
+    <div class="field">
+      <label>Tom da voz (pitch) <span class="val" id="pitchVal">0</span></label>
+      <input type="range" id="rngPitch" min="-12" max="12" step="1" value="0" />
+      <p class="hint">−12 grave · 0 normal · +12 agudo. Processado antes de enviar.</p>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="chkNoise"> Supressão de ruído</label>
+      <label><input type="checkbox" id="chkEcho"> Cancelamento de eco</label>
+      <label><input type="checkbox" id="chkAgc"> Ganho automático</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Vídeo</div>
+    <div class="row2">
+      <div class="field">
+        <label>Resolução</label>
+        <select id="selRes">
+          <option value="1280x720">720p</option>
+          <option value="1920x1080">1080p</option>
+          <option value="854x480">480p</option>
+          <option value="640x360">360p</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>FPS</label>
+        <select id="selFps">
+          <option value="30">30</option>
+          <option value="24">24</option>
+          <option value="15">15</option>
+          <option value="60">60</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Câmera</label>
+        <select id="selFacing">
+          <option value="environment">Traseira</option>
+          <option value="user">Frontal</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Bitrate</label>
+        <select id="selBitrate">
+          <option value="2500000">2.5 Mbps</option>
+          <option value="1500000">1.5 Mbps</option>
+          <option value="4000000">4 Mbps</option>
+          <option value="800000">0.8 Mbps</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Overlays no stream</div>
+    <p class="hint" style="margin-top:0;margin-bottom:10px">
+      Texto e imagens entram <strong>dentro do vídeo enviado</strong> (aparecem no OBS juntos).
+      Páginas web (LivePix em iframe) não podem ser “gravadas” no stream por segurança do navegador — use texto/imagem aqui, ou LivePix como fonte separada no OBS.
+    </p>
+    <div class="seg" id="ovTypeSeg">
+      <button type="button" class="on" data-type="text">Texto</button>
+      <button type="button" data-type="image">Imagem</button>
+    </div>
+    <div id="ovTextFields">
+      <div class="field"><label>Texto</label><input type="text" id="ovText" placeholder="Obrigado pela doação!" /></div>
+      <div class="row2">
+        <div class="field"><label>Cor</label><input type="text" id="ovColor" value="#ffffff" /></div>
+        <div class="field"><label>Tamanho</label><input type="number" id="ovFontSize" value="42" min="12" max="120" /></div>
+      </div>
+    </div>
+    <div id="ovImageFields" style="display:none">
+      <div class="field"><label>URL da imagem (PNG ok)</label><input type="text" id="ovImageUrl" placeholder="https://.../alerta.png" /></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>X %</label><input type="number" id="ovX" value="50" min="0" max="100" /></div>
+      <div class="field"><label>Y %</label><input type="number" id="ovY" value="80" min="0" max="100" /></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Escala %</label><input type="number" id="ovScale" value="100" min="20" max="300" /></div>
+      <div class="field"><label>Opacidade %</label><input type="number" id="ovOpacity" value="100" min="10" max="100" /></div>
+    </div>
+    <button class="btn green" id="btnAddOv" type="button">Adicionar overlay</button>
+    <div id="ovList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Sala P2P</div>
+    <div class="field">
+      <label>URL do receptor (site do OBS)</label>
+      <input type="text" id="inpReceiverBase" placeholder="https://receptor.edgeone.dev/" />
+    </div>
+    <div class="field">
+      <label>Código da sala (opcional)</label>
+      <input type="text" id="inpRoom" placeholder="ex: minha-live" maxlength="32" />
+    </div>
+    <button class="btn green" id="btnStartRoom" disabled>Criar / reativar sala</button>
+    <div class="field" style="margin-top:12px"><label>Código</label><div class="room-code" id="roomCode">—</div></div>
+    <div class="field">
+      <label>Link do receptor (OBS)</label>
+      <textarea id="shareLink" readonly placeholder="Após criar a sala…"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn gray sm" id="btnCopy" disabled>Copiar link</button>
+      <button class="btn gray sm" id="btnNewRoom" disabled>Nova sala</button>
+    </div>
+    <p class="hint">A sala só muda em “Nova sala”. Deixe esta aba aberta.</p>
+  </div>
+
+  <div class="card"><div class="status" id="status">Status: abra a câmera para começar</div></div>
+
+  <script>
+
+        const ICE = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        // TURN gratuito (Open Relay) — essencial celular ↔ Wi‑Fi / NAT difícil
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+      ],
+      sdpSemantics: 'unified-plan'
+    };
+    const ROOM_KEY = 'irl_locked_room_id';
+    const VIEWER_KEY = 'irl_last_viewer_id';
+    const OV_KEY = 'irl_emit_overlays_v1';
+
+    let localStream = null;
+    let outboundStream = null;
+    let peer = null, mediaCall = null, lockedRoomId = null, lastViewerId = null;
+    let live = false, muted = false, roomStarting = false, cameraOn = false;
+    let composeTimer = null, composeInterval = null, canvasStream = null;
+    let audioCtx = null, pitchNode = null, gainNode = null, audioDest = null;
+    let pitchSemitones = 0, ovType = 'text', overlays = [], imageCache = {};
+
+    const camVideo = document.getElementById('camVideo');
+    const canvas = document.getElementById('composeCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+
+    function log(msg) { statusEl.innerHTML = 'Status: ' + msg; console.log('[emitir]', msg); }
+    function sanitize(raw) {
+      if (!raw) return null;
+      return String(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 32) || null;
+    }
+    function saveRoom(id) { lockedRoomId = id; try { localStorage.setItem(ROOM_KEY, id); } catch (_) {} }
+    function clearSavedRoom() { lockedRoomId = null; try { localStorage.removeItem(ROOM_KEY); } catch (_) {} }
+    function loadSavedRoom() { try { return sanitize(localStorage.getItem(ROOM_KEY)); } catch (_) { return null; } }
+    const RECV_BASE_KEY = 'irl_receiver_base_url';
+    function defaultReceiverBase() {
+      // Domínios separados (EdgeOne): emissor != receptor
+      if (/edgeone\.dev$/i.test(location.hostname) || /standard-pink/i.test(location.hostname)) {
+        return 'https://receptor.edgeone.dev/';
+      }
+      // Mesmo site: recebe na mesma pasta
+      return location.href.replace(/[^/]*$/, '') + 'receber.html';
+    }
+    function getReceiverBase() {
+      const el = document.getElementById('inpReceiverBase');
+      let base = (el && el.value.trim()) || '';
+      if (!base) {
+        try { base = localStorage.getItem(RECV_BASE_KEY) || ''; } catch (_) {}
+      }
+      if (!base) base = defaultReceiverBase();
+      if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+      if (!base.endsWith('/') && !base.endsWith('.html')) base += '/';
+      return base;
+    }
+    function receiverUrl(roomId) {
+      const base = getReceiverBase();
+      const join = base.includes('?') ? '&' : '?';
+      // se base já é arquivo .html, só adiciona query; se é pasta, usa ?
+      if (/\.html?([?#]|$)/i.test(base)) {
+        return base.replace(/[?#].*$/, '') + '?sala=' + encodeURIComponent(roomId);
+      }
+      return base.replace(/\/$/, '/') + '?sala=' + encodeURIComponent(roomId);
+    }
+    function persistReceiverBase() {
+      const el = document.getElementById('inpReceiverBase');
+      if (!el) return;
+      const v = el.value.trim() || defaultReceiverBase();
+      el.value = v;
+      try { localStorage.setItem(RECV_BASE_KEY, v); } catch (_) {}
+    }
+    function showRoomUI(id) {
+      persistReceiverBase();
+      document.getElementById('roomCode').textContent = id;
+      document.getElementById('shareLink').value = receiverUrl(id);
+      document.getElementById('btnCopy').disabled = false;
+      document.getElementById('btnNewRoom').disabled = false;
+      document.getElementById('btnStartRoom').textContent = 'Sala ativa (fixa)';
+      document.getElementById('inpRoom').value = id;
+      document.getElementById('inpRoom').disabled = true;
+    }
+
+    function loadOverlays() {
+      try { overlays = JSON.parse(localStorage.getItem(OV_KEY) || '[]'); if (!Array.isArray(overlays)) overlays = []; }
+      catch { overlays = []; }
+      overlays.filter(o => o.type === 'image' && o.url).forEach(o => preloadImage(o.url));
+      renderOvList();
+    }
+    function saveOverlays() { try { localStorage.setItem(OV_KEY, JSON.stringify(overlays)); } catch (_) {} }
+    function preloadImage(url) {
+      if (imageCache[url]) return imageCache[url];
+      const img = new Image(); img.crossOrigin = 'anonymous'; img.src = url;
+      imageCache[url] = img; return img;
+    }
+    function renderOvList() {
+      const list = document.getElementById('ovList'); list.innerHTML = '';
+      if (!overlays.length) { list.innerHTML = '<p class="hint">Nenhum overlay no stream.</p>'; return; }
+      overlays.forEach((ov, idx) => {
+        const card = document.createElement('div'); card.className = 'ov-card';
+        card.innerHTML =
+          '<h4>' + (ov.type === 'text' ? 'TXT ' + (ov.text || '') : 'IMG ' + (ov.url || '')) + '</h4>' +
+          '<div class="row2"><div class="field"><label>X%</label><input type="number" data-k="x" value="' + ov.x + '"></div>' +
+          '<div class="field"><label>Y%</label><input type="number" data-k="y" value="' + ov.y + '"></div></div>' +
+          '<div class="row2"><div class="field"><label>Escala%</label><input type="number" data-k="scale" value="' + (ov.scale || 100) + '"></div>' +
+          '<div class="field"><label>Opac.%</label><input type="number" data-k="opacity" value="' + (ov.opacity || 100) + '"></div></div>' +
+          '<div class="btn-row"><button type="button" class="btn gray sm" data-act="up">↑</button>' +
+          '<button type="button" class="btn gray sm" data-act="down">↓</button>' +
+          '<button type="button" class="btn red sm" data-act="del">Remover</button></div>';
+        card.querySelectorAll('input[data-k]').forEach(inp => {
+          inp.addEventListener('input', () => {
+            const k = inp.getAttribute('data-k'); let v = parseFloat(inp.value);
+            if (isNaN(v)) return; ov[k] = v; saveOverlays();
+          });
+        });
+        card.querySelectorAll('button').forEach(btn => {
+          btn.onclick = () => {
+            const act = btn.getAttribute('data-act');
+            if (act === 'del') { overlays.splice(idx, 1); saveOverlays(); renderOvList(); }
+            else if (act === 'up' && idx > 0) { const t = overlays[idx - 1]; overlays[idx - 1] = overlays[idx]; overlays[idx] = t; saveOverlays(); renderOvList(); }
+            else if (act === 'down' && idx < overlays.length - 1) { const t = overlays[idx + 1]; overlays[idx + 1] = overlays[idx]; overlays[idx] = t; saveOverlays(); renderOvList(); }
+          };
+        });
+        list.appendChild(card);
+      });
+    }
+
+    document.querySelectorAll('#ovTypeSeg button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('#ovTypeSeg button').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on'); ovType = btn.getAttribute('data-type');
+        document.getElementById('ovTextFields').style.display = ovType === 'text' ? '' : 'none';
+        document.getElementById('ovImageFields').style.display = ovType === 'image' ? '' : 'none';
+      };
+    });
+
+    document.getElementById('btnAddOv').onclick = () => {
+      if (ovType === 'text') {
+        const text = document.getElementById('ovText').value.trim();
+        if (!text) return alert('Digite um texto');
+        overlays.push({
+          type: 'text', text,
+          color: document.getElementById('ovColor').value || '#fff',
+          fontSize: parseFloat(document.getElementById('ovFontSize').value) || 42,
+          x: parseFloat(document.getElementById('ovX').value) || 50,
+          y: parseFloat(document.getElementById('ovY').value) || 80,
+          scale: parseFloat(document.getElementById('ovScale').value) || 100,
+          opacity: parseFloat(document.getElementById('ovOpacity').value) || 100
+        });
+      } else {
+        let url = document.getElementById('ovImageUrl').value.trim();
+        if (!url) return alert('Informe a URL da imagem');
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+        preloadImage(url);
+        overlays.push({
+          type: 'image', url,
+          x: parseFloat(document.getElementById('ovX').value) || 10,
+          y: parseFloat(document.getElementById('ovY').value) || 10,
+          scale: parseFloat(document.getElementById('ovScale').value) || 100,
+          opacity: parseFloat(document.getElementById('ovOpacity').value) || 100
+        });
+      }
+      saveOverlays(); renderOvList();
+    };
+
+    function paintFrame() {
+      if (!canvas.width || !canvas.height) {
+        canvas.width = 1280;
+        canvas.height = 720;
+      }
+      if (cameraOn && camVideo.videoWidth) {
+        const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+        if (canvas.width !== vw || canvas.height !== vh) {
+          canvas.width = vw;
+          canvas.height = vh;
+        }
+        ctx.save();
+        if (document.getElementById('selFacing').value === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        try { ctx.drawImage(camVideo, 0, 0, canvas.width, canvas.height); } catch (_) {}
+        ctx.restore();
+      } else {
+        // Câmera off: fundo preto (stream continua vivo)
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font = 'bold 28px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('CÂMERA DESLIGADA', canvas.width / 2, canvas.height / 2);
+      }
+
+      overlays.forEach(ov => {
+        const op = (ov.opacity ?? 100) / 100;
+        const scale = (ov.scale ?? 100) / 100;
+        const x = (ov.x / 100) * canvas.width;
+        const y = (ov.y / 100) * canvas.height;
+        ctx.save();
+        ctx.globalAlpha = op;
+        if (ov.type === 'text') {
+          const size = (ov.fontSize || 42) * scale * (canvas.width / 1280);
+          ctx.font = 'bold ' + size + 'px Inter, system-ui, sans-serif';
+          ctx.fillStyle = ov.color || '#fff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineWidth = Math.max(2, size / 12);
+          ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+          ctx.strokeText(ov.text, x, y);
+          ctx.fillText(ov.text, x, y);
+        } else if (ov.type === 'image') {
+          const img = imageCache[ov.url];
+          if (img && img.complete && img.naturalWidth) {
+            const w = img.naturalWidth * scale * (canvas.width / 1280);
+            const h = img.naturalHeight * scale * (canvas.width / 1280);
+            ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+          }
+        }
+        ctx.restore();
+      });
+    }
+
+    function startCompose() {
+      stopCompose();
+      // rAF para fluidez + setInterval como backup (celular/aba em segundo plano trava rAF)
+      const loop = () => {
+        paintFrame();
+        composeTimer = requestAnimationFrame(loop);
+      };
+      composeTimer = requestAnimationFrame(loop);
+      const fps = parseInt(document.getElementById('selFps').value, 10) || 30;
+      const ms = Math.max(15, Math.round(1000 / Math.min(fps, 30)));
+      composeInterval = setInterval(paintFrame, ms);
+    }
+
+    function stopCompose() {
+      if (composeTimer) { cancelAnimationFrame(composeTimer); composeTimer = null; }
+      if (composeInterval) { clearInterval(composeInterval); composeInterval = null; }
+    }
+
+    // Pitch só quando != 0 (ScriptProcessor reduz qualidade se usado sempre)
+    function createPitchProcessor(ctx) {
+      const bufferSize = 2048;
+      const node = ctx.createScriptProcessor(bufferSize, 1, 1);
+      const bufSize = bufferSize * 8;
+      const buf = new Float32Array(bufSize);
+      let writePos = 0, readPos = 0;
+      node.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const output = e.outputBuffer.getChannelData(0);
+        const r = Math.pow(2, pitchSemitones / 12);
+        for (let i = 0; i < input.length; i++) { buf[writePos] = input[i]; writePos = (writePos + 1) % bufSize; }
+        for (let i = 0; i < output.length; i++) {
+          const i0 = Math.floor(readPos) % bufSize;
+          const i1 = (i0 + 1) % bufSize;
+          const frac = readPos - Math.floor(readPos);
+          let s = buf[i0] * (1 - frac) + buf[i1] * frac;
+          // leve compensação de volume no pitch
+          s *= 1.35;
+          output[i] = Math.max(-1, Math.min(1, s));
+          readPos += r;
+          if (readPos >= bufSize) readPos -= bufSize;
+          let lag = writePos - readPos; if (lag < 0) lag += bufSize;
+          if (lag > bufSize * 0.8) readPos = (writePos - bufferSize * 2 + bufSize) % bufSize;
+          if (lag < bufferSize) readPos = (writePos - bufferSize * 3 + bufSize) % bufSize;
+        }
+      };
+      return node;
+    }
+
+    function applyMuteToTracks() {
+      if (!localStream) return;
+      localStream.getAudioTracks().forEach(t => { t.enabled = !muted; });
+      if (gainNode) gainNode.gain.value = muted ? 0 : 1.0;
+    }
+
+    function rebuildAudioGraph() {
+      if (!localStream) return;
+      // Fecha grafo anterior
+      if (audioCtx) { try { audioCtx.close(); } catch (_) {} audioCtx = null; }
+      pitchNode = null; gainNode = null; audioDest = null;
+
+      // Pitch 0: usa o microfone ORIGINAL (qualidade e volume máximos)
+      if (pitchSemitones === 0) {
+        applyMuteToTracks();
+        rebuildOutbound();
+        return;
+      }
+
+      // Pitch != 0: processa com Web Audio + ganho
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      const source = audioCtx.createMediaStreamSource(localStream);
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = muted ? 0 : 1.4; // compensar perda do processamento
+      audioDest = audioCtx.createMediaStreamDestination();
+      pitchNode = createPitchProcessor(audioCtx);
+      source.connect(pitchNode);
+      pitchNode.connect(gainNode);
+      gainNode.connect(audioDest);
+      applyMuteToTracks();
+      rebuildOutbound();
+    }
+
+    function ensureCanvasStream() {
+      const fps = parseInt(document.getElementById('selFps').value, 10) || 30;
+      if (!canvas.width || !canvas.height) {
+        canvas.width = 1280;
+        canvas.height = 720;
+      }
+      // Reutiliza o MESMO captureStream — recriar a cada rebuild congela o vídeo no receptor
+      if (canvasStream && canvasStream.getVideoTracks()[0] &&
+          canvasStream.getVideoTracks()[0].readyState === 'live') {
+        return canvasStream;
+      }
+      try {
+        if (canvasStream) {
+          canvasStream.getTracks().forEach(tr => { try { tr.stop(); } catch (_) {} });
+        }
+        canvasStream = canvas.captureStream(fps);
+      } catch (e) {
+        console.warn('captureStream', e);
+        canvasStream = null;
+      }
+      return canvasStream;
+    }
+
+    function rebuildOutbound() {
+      const tracks = [];
+      const cs = ensureCanvasStream();
+      if (cs && cs.getVideoTracks()[0]) tracks.push(cs.getVideoTracks()[0]);
+      else if (localStream && localStream.getVideoTracks()[0]) tracks.push(localStream.getVideoTracks()[0]);
+
+      if (pitchSemitones !== 0 && audioDest && audioDest.stream.getAudioTracks()[0]) {
+        tracks.push(audioDest.stream.getAudioTracks()[0]);
+      } else if (localStream && localStream.getAudioTracks()[0]) {
+        const at = localStream.getAudioTracks()[0];
+        at.enabled = !muted;
+        tracks.push(at);
+      }
+
+      if (!tracks.length) { outboundStream = null; return; }
+      outboundStream = new MediaStream(tracks);
+      replaceTracksOnCall();
+    }
+
+    async function replaceTracksOnCall() {
+      if (!outboundStream || !mediaCall || !mediaCall.peerConnection) return;
+      const senders = mediaCall.peerConnection.getSenders();
+      for (const track of outboundStream.getTracks()) {
+        const s = senders.find(x => x.track && x.track.kind === track.kind);
+        if (s) { try { await s.replaceTrack(track); } catch (e) { console.warn(e); } }
+      }
+    }
+
+    async function startCamera() {
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+      const [w, h] = document.getElementById('selRes').value.split('x').map(Number);
+      const fps = parseInt(document.getElementById('selFps').value, 10);
+      const facing = document.getElementById('selFacing').value;
+      const audio = {
+        echoCancellation: document.getElementById('chkEcho').checked,
+        noiseSuppression: document.getElementById('chkNoise').checked,
+        autoGainControl: document.getElementById('chkAgc').checked,
+        channelCount: 1
+      };
+      const videoIdeal = { facingMode: { ideal: facing }, width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps } };
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: { ...videoIdeal, facingMode: { exact: facing } }, audio });
+      } catch {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: videoIdeal, audio });
+      }
+      camVideo.srcObject = localStream;
+      await camVideo.play().catch(() => {});
+      cameraOn = true;
+      startCompose();
+      rebuildAudioGraph();
+    }
+
+    function stopVideoOnly() {
+      // Desliga só a câmera — mantém sala, peer e (opcional) áudio
+      if (localStream) {
+        localStream.getVideoTracks().forEach(t => { try { t.stop(); } catch (_) {} });
+        // Mantém tracks de áudio se existirem
+        const audioTracks = localStream.getAudioTracks().filter(t => t.readyState === 'live');
+        if (audioTracks.length) {
+          localStream = new MediaStream(audioTracks);
+        } else {
+          localStream = null;
+        }
+      }
+      camVideo.srcObject = null;
+      cameraOn = false;
+      // Canvas continua pintando tela preta + overlays
+      if (!composeTimer && !composeInterval) startCompose();
+      rebuildOutbound();
+      log('Câmera desligada — sala continua ativa. Toque em Abrir câmera para voltar.');
+    }
+
+    function destroyPeer() {
+      try { if (mediaCall) mediaCall.close(); } catch (_) {}
+      mediaCall = null;
+      try { if (peer) peer.destroy(); } catch (_) {}
+      peer = null;
+    }
+    function rememberViewer(id) {
+      lastViewerId = id; try { localStorage.setItem(VIEWER_KEY, id); } catch (_) {}
+    }
+
+    // Envia o stream para o peer ID do receptor (ID do PeerJS dele, não URL de site)
+    function callViewer(viewerId) {
+      if (!outboundStream || !peer || peer.destroyed || !viewerId) return;
+      rememberViewer(viewerId);
+      try {
+        if (mediaCall) { try { mediaCall.close(); } catch (_) {} }
+        // Garante tracks ativos
+        outboundStream.getTracks().forEach(t => { t.enabled = true; });
+        const call = peer.call(viewerId, outboundStream);
+        mediaCall = call;
+        call.on('close', () => log('Receptor saiu — deixe a sala ativa; ele pode entrar de novo pelo mesmo link'));
+        call.on('error', e => {
+          // peer-unavailable = receptor antigo offline (normal após reconectar)
+          log('Aviso na chamada: ' + ((e && e.message) || e) + ' — aguardando novo pedido do receptor…');
+        });
+        log('<strong>Enviando</strong> para o receptor agora…');
+      } catch (e) {
+        log('Falha ao enviar: ' + e.message);
+      }
+    }
+
+    function handleViewerMessage(data) {
+      if (!data || data.type !== 'viewer-ready' || !data.viewerId) return;
+      log('Receptor pediu o stream (' + String(data.viewerId).slice(0, 8) + '…)');
+      // Pequeno atraso para o peer do receptor ficar pronto
+      setTimeout(() => callViewer(data.viewerId), 250);
+    }
+
+    function startRoom(roomId, { allowNewId = false, retry = 0 } = {}) {
+      if (roomStarting) return Promise.reject(new Error('Já iniciando sala…'));
+      roomStarting = true;
+      return new Promise((resolve, reject) => {
+        destroyPeer();
+        const wantId = roomId || lockedRoomId || null;
+        const opts = { debug: 1, config: ICE };
+        peer = wantId ? new Peer(wantId, opts) : new Peer(opts);
+        let settled = false;
+        const t = setTimeout(() => {
+          if (!settled) { roomStarting = false; reject(new Error('Timeout na sinalização (20s)')); }
+        }, 20000);
+
+        peer.on('open', (id) => {
+          if (settled) return;
+          settled = true; roomStarting = false; clearTimeout(t);
+          saveRoom(id); showRoomUI(id);
+          log(
+            '<strong>Sala ativa:</strong> ' + id +
+            '<br>Não envia para um “site”: o receptor entra com o <strong>mesmo código</strong> no receber.html e pede o stream.' +
+            '<br>Aguardando o OBS/receptor abrir o link…'
+          );
+          resolve(id);
+        });
+
+        peer.on('error', (err) => {
+          const et = err && err.type;
+          const msg = (err && (err.message || err.type)) || String(err);
+          if (et === 'unavailable-id') {
+            clearTimeout(t);
+            if (wantId && !allowNewId && retry < 8) {
+              const wait = 2000 + retry * 1000;
+              log('Sala ainda presa no servidor — retry em ' + (wait / 1000) + 's…');
+              roomStarting = false;
+              setTimeout(() => startRoom(wantId, { allowNewId: false, retry: retry + 1 }).then(resolve).catch(reject), wait);
+              return;
+            }
+            roomStarting = false;
+            if (!settled) { settled = true; reject(new Error('Código em uso. Aguarde 5s e toque em Reativar sala.')); }
+            return;
+          }
+          // Receptor antigo offline — ignore
+          if (et === 'peer-unavailable') return;
+          if (et === 'network' || et === 'disconnected' || et === 'server-error') {
+            try { peer.reconnect(); } catch (_) {}
+            return;
+          }
+          if (!settled) { settled = true; roomStarting = false; clearTimeout(t); reject(new Error(msg)); }
+        });
+
+        peer.on('disconnected', () => {
+          log('Sinalização caiu — reconectando na mesma sala…');
+          try { peer.reconnect(); } catch (_) {}
+        });
+
+        // Receptor avisa por DataConnection
+        peer.on('connection', (conn) => {
+          log('Receptor conectou na sinalização…');
+          conn.on('open', () => {
+            // pede que reenvie viewer-ready se já estiver aberto
+            try { conn.send({ type: 'publisher-ready', roomId: lockedRoomId }); } catch (_) {}
+          });
+          conn.on('data', handleViewerMessage);
+        });
+
+        // Fallback: receptor liga direto
+        peer.on('call', (call) => {
+          if (!outboundStream) { call.close(); return; }
+          mediaCall = call;
+          outboundStream.getTracks().forEach(t => { t.enabled = true; });
+          call.answer(outboundStream);
+          log('<strong>Chamada recebida</strong> — enviando composição');
+          call.on('close', () => log('Receptor saiu — aguardando novo link/reconexão…'));
+        });
+      });
+    }
+
+    async function ensureRoomActive() {
+      if (!outboundStream || !lockedRoomId) return;
+      // Peer ainda vivo na mesma sala: não destroi (evita unavailable-id)
+      if (peer && !peer.destroyed && peer.open) {
+        showRoomUI(lockedRoomId);
+        log('Sala <strong>' + lockedRoomId + '</strong> online — aguardando o receptor pedir o stream de novo.');
+        return;
+      }
+      // Desconectado mas objeto existe: tenta reconnect em vez de novo Peer
+      if (peer && !peer.destroyed && !peer.open) {
+        try {
+          peer.reconnect();
+          log('Reconectando sinalização da sala ' + lockedRoomId + '…');
+          await new Promise((res, rej) => {
+            const t = setTimeout(() => rej(new Error('Reconnect timeout')), 10000);
+            const onOpen = () => { clearTimeout(t); peer.off('open', onOpen); res(); };
+            peer.on('open', onOpen);
+          });
+          showRoomUI(lockedRoomId);
+          return;
+        } catch (e) {
+          log('Reconnect falhou, recriando sala…');
+        }
+      }
+      await startRoom(lockedRoomId, { allowNewId: false, retry: 0 });
+    }
+
+    document.getElementById('btnCam').onclick = async () => {
+      try {
+        await startCamera();
+        document.getElementById('btnCam').textContent = 'Abrir câmera';
+        document.getElementById('btnCam').disabled = false;
+        document.getElementById('btnCamOff').disabled = false;
+        document.getElementById('btnLive').disabled = false;
+        document.getElementById('btnStop').disabled = false;
+        document.getElementById('btnStartRoom').disabled = false;
+        document.getElementById('btnMute').disabled = false;
+        document.getElementById('btnFlip').disabled = false;
+        const bootOutbound = () => {
+          rebuildAudioGraph();
+          rebuildOutbound();
+          if (outboundStream) log('Câmera ligada — sala/transmissão não são afetadas');
+          else log('Câmera ligada — aguardando primeiro frame…');
+        };
+        if (camVideo.readyState >= 2) bootOutbound();
+        else camVideo.addEventListener('loadeddata', bootOutbound, { once: true });
+        setTimeout(bootOutbound, 800);
+      } catch (e) { alert('Erro câmera: ' + e.message); log('Erro: ' + e.message); }
+    };
+
+    document.getElementById('btnCamOff').onclick = () => {
+      if (!cameraOn) return;
+      stopVideoOnly();
+      document.getElementById('btnCamOff').disabled = true;
+      document.getElementById('btnFlip').disabled = true;
+      document.getElementById('btnCam').disabled = false;
+      document.getElementById('btnCam').textContent = 'Ligar câmera';
+    };
+    document.getElementById('btnFlip').onclick = async () => {
+      const sel = document.getElementById('selFacing');
+      sel.value = sel.value === 'user' ? 'environment' : 'user';
+      try { await startCamera(); log('Câmera: ' + sel.value); } catch (e) { alert(e.message); }
+    };
+    document.getElementById('selFacing').onchange = async () => {
+      if (!localStream) return;
+      try { await startCamera(); } catch (e) { alert(e.message); }
+    };
+    document.getElementById('btnMute').onclick = () => {
+      muted = !muted;
+      applyMuteToTracks();
+      document.getElementById('btnMute').textContent = muted ? 'Ativar mic' : 'Mutar mic';
+      document.getElementById('muteBadge').classList.toggle('on', muted);
+      log(muted ? 'Microfone mutado' : 'Microfone ativo');
+    };
+    document.getElementById('rngPitch').oninput = () => {
+      pitchSemitones = parseInt(document.getElementById('rngPitch').value, 10) || 0;
+      document.getElementById('pitchVal').textContent = (pitchSemitones > 0 ? '+' : '') + pitchSemitones;
+      if (localStream) rebuildAudioGraph();
+    };
+    document.getElementById('btnLive').onclick = async () => {
+      if (!localStream) return;
+      live = true; rebuildOutbound();
+      document.getElementById('btnLive').disabled = true;
+      document.getElementById('btnStop').disabled = false;
+      document.getElementById('liveBadge').classList.add('on');
+      document.getElementById('pillLive').textContent = 'AO VIVO';
+      document.getElementById('pillLive').classList.remove('off');
+      if (lockedRoomId) {
+        try { await ensureRoomActive(); log('<strong>Ao vivo</strong> na sala ' + lockedRoomId); }
+        catch (e) {
+          log('Ao vivo, falha na sala: ' + e.message);
+          document.getElementById('btnStartRoom').disabled = false;
+          document.getElementById('btnStartRoom').textContent = 'Reativar sala';
+        }
+      } else {
+        document.getElementById('btnStartRoom').disabled = false;
+        log('Ao vivo. Crie a sala para gerar o link.');
+      }
+    };
+    document.getElementById('btnStop').onclick = () => {
+      live = false;
+      // Mantém a sala PeerJS viva (mesmo código) — só para mídia
+      try { if (mediaCall) mediaCall.close(); } catch (_) {}
+      mediaCall = null;
+      stopCompose();
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; camVideo.srcObject = null; }
+      if (audioCtx) { try { audioCtx.close(); } catch (_) {} audioCtx = null; }
+      audioDest = null; gainNode = null; pitchNode = null;
+      if (canvasStream) {
+        try { canvasStream.getTracks().forEach(tr => tr.stop()); } catch (_) {}
+        canvasStream = null;
+      }
+      outboundStream = null;
+      cameraOn = false;
+      document.getElementById('btnCam').disabled = false;
+      document.getElementById('btnCam').textContent = 'Abrir câmera';
+      document.getElementById('btnCamOff').disabled = true;
+      document.getElementById('btnLive').disabled = true;
+      document.getElementById('btnStop').disabled = true;
+      document.getElementById('btnMute').disabled = true;
+      document.getElementById('btnFlip').disabled = true;
+      document.getElementById('liveBadge').classList.remove('on');
+      document.getElementById('muteBadge').classList.remove('on');
+      document.getElementById('pillLive').textContent = 'OFFLINE';
+      document.getElementById('pillLive').classList.add('off');
+      muted = false; document.getElementById('btnMute').textContent = 'Mutar mic';
+      if (lockedRoomId && peer && !peer.destroyed) {
+        showRoomUI(lockedRoomId);
+        document.getElementById('btnStartRoom').disabled = false;
+        document.getElementById('btnStartRoom').textContent = 'Reativar sala';
+        log('Parado. <strong>Sala ' + lockedRoomId + ' continua online</strong>. Abra a câmera → Ao vivo ou Reativar sala.');
+      } else if (lockedRoomId) {
+        showRoomUI(lockedRoomId);
+        document.getElementById('btnStartRoom').disabled = false;
+        document.getElementById('btnStartRoom').textContent = 'Reativar sala';
+        log('Parado. Sala guardada: <strong>' + lockedRoomId + '</strong>.');
+      } else {
+        document.getElementById('btnStartRoom').textContent = 'Criar / reativar sala';
+        log('Parado');
+      }
+    };
+    document.getElementById('btnStartRoom').onclick = async () => {
+      if (!localStream) {
+        alert('Abra a câmera primeiro.');
+        return;
+      }
+      // Garante áudio + canvas compostos mesmo sem ter clicado em Ao vivo
+      if (!audioDest) rebuildAudioGraph();
+      if (!composeTimer) startCompose();
+      rebuildOutbound();
+      if (!outboundStream) {
+        alert('Não foi possível montar o stream. Aguarde 1s após abrir a câmera e tente de novo.');
+        log('Falha: outboundStream vazio');
+        return;
+      }
+      if (lockedRoomId && peer && !peer.destroyed && peer.open) {
+        showRoomUI(lockedRoomId);
+        log('Sala já ativa: <strong>' + lockedRoomId + '</strong>. Atualize o link no receptor.');
+        return;
+      }
+      // evita trava se tentativa anterior ficou pendente
+      roomStarting = false;
+      try {
+        log('Criando/reativando sala…');
+        const preferred = lockedRoomId || sanitize(document.getElementById('inpRoom').value);
+        const id = await startRoom(preferred, { allowNewId: false, retry: 0 });
+        log('<strong>Sala criada:</strong> ' + id + ' — link pronto para o receptor');
+        try { await navigator.clipboard.writeText(document.getElementById('shareLink').value); } catch (_) {}
+      } catch (e) {
+        roomStarting = false;
+        alert('Não criou a sala: ' + e.message);
+        log('Falha ao criar sala: ' + e.message);
+      }
+    };
+    document.getElementById('btnNewRoom').onclick = async () => {
+      if (!confirm('Nova sala? O link antigo deixa de funcionar.')) return;
+      destroyPeer();
+      clearSavedRoom(); lastViewerId = null;
+      try { localStorage.removeItem(VIEWER_KEY); } catch (_) {}
+      document.getElementById('inpRoom').disabled = false;
+      document.getElementById('inpRoom').value = '';
+      document.getElementById('roomCode').textContent = '—';
+      document.getElementById('shareLink').value = '';
+      document.getElementById('btnStartRoom').textContent = 'Criar / reativar sala';
+      if (!outboundStream && !localStream) return;
+      if (!outboundStream && localStream) { rebuildAudioGraph(); rebuildOutbound(); }
+      try { await startRoom(null, { allowNewId: true, retry: 0 }); } catch (e) { alert(e.message); }
+    };
+    document.getElementById('btnCopy').onclick = async () => {
+      const v = document.getElementById('shareLink').value; if (!v) return;
+      try { await navigator.clipboard.writeText(v); log('Link copiado'); }
+      catch { document.getElementById('shareLink').select(); }
+    };
+
+    loadOverlays();
+    (function initReceiverBase() {
+      const el = document.getElementById('inpReceiverBase');
+      if (!el) return;
+      let saved = '';
+      try { saved = localStorage.getItem(RECV_BASE_KEY) || ''; } catch (_) {}
+      el.value = saved || defaultReceiverBase();
+      el.addEventListener('change', persistReceiverBase);
+      el.addEventListener('blur', persistReceiverBase);
+    })();
+    (function restore() {
+      try { lastViewerId = localStorage.getItem(VIEWER_KEY) || null; } catch (_) {}
+      const saved = loadSavedRoom();
+      if (saved) {
+        lockedRoomId = saved; showRoomUI(saved);
+        document.getElementById('btnStartRoom').textContent = 'Reativar sala';
+        log('Sala guardada: <strong>' + saved + '</strong>. Abra a câmera → Ao vivo.');
+      } else log('Abra a câmera para começar');
+    })();
+  </script>
+</body>
+</html>
